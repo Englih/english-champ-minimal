@@ -22,15 +22,63 @@ function page(content) {
 <meta charset="utf-8">
 <title>English Champ</title>
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(180deg,#4a90ff,#6ab7ff);min-height:100vh;display:flex;justify-content:center;align-items:center;}
-.card{background:white;padding:35px;border-radius:25px;box-shadow:0 10px 30px rgba(0,0,0,.25);text-align:center;width:460px;max-width:90%;}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:linear-gradient(180deg,#4a90ff,#6ab7ff);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.card{
+  background:white;
+  padding:35px;
+  border-radius:25px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  text-align:center;
+  width:460px;
+  max-width:90%;
+}
 h1{color:#1f3f75;margin-top:0;}
-.btn{display:block;width:100%;box-sizing:border-box;padding:14px;margin:10px 0;border:none;border-radius:15px;font-size:18px;font-weight:bold;cursor:pointer;text-decoration:none;}
-.yellow{background:#ffcc00;color:black}.green{background:#4caf50;color:white}.blue{background:#2196f3;color:white}.red{background:#e53935;color:white}.gray{background:#ddd;color:#222}
-input,select{width:100%;box-sizing:border-box;padding:12px;font-size:17px;border-radius:12px;border:1px solid #ccc;margin:8px 0;}
-.list{text-align:left;background:#f2f6ff;border-radius:14px;padding:12px;margin:10px 0;}
+.btn{
+  display:block;
+  width:100%;
+  box-sizing:border-box;
+  padding:14px;
+  margin:10px 0;
+  border:none;
+  border-radius:15px;
+  font-size:18px;
+  font-weight:bold;
+  cursor:pointer;
+  text-decoration:none;
+}
+.yellow{background:#ffcc00;color:black}
+.green{background:#4caf50;color:white}
+.blue{background:#2196f3;color:white}
+.red{background:#e53935;color:white}
+.gray{background:#ddd;color:#222}
+input{
+  width:100%;
+  box-sizing:border-box;
+  padding:12px;
+  font-size:17px;
+  border-radius:12px;
+  border:1px solid #ccc;
+  margin:8px 0;
+}
+.list{
+  text-align:left;
+  background:#f2f6ff;
+  border-radius:14px;
+  padding:12px;
+  margin:10px 0;
+}
 .small{font-size:14px;color:#666;}
 .symbols{font-size:34px;margin-top:20px;}
+.correct{font-size:60px;color:#4caf50;}
+.wrong{font-size:60px;color:#e53935;}
 </style>
 </head>
 <body><div class="card">${content}</div></body></html>`;
@@ -53,6 +101,9 @@ app.get("/teacher", (req, res) => {
       <strong>${c.name}</strong><br>
       <span class="small">${students.filter(s => s.classId === c.id).length} Schüler/innen</span>
       <a class="btn blue" href="/teacher/class/${c.id}">Öffnen</a>
+      <form method="POST" action="/teacher/class/${c.id}/delete">
+        <button class="btn red" type="submit">Klasse löschen</button>
+      </form>
     </div>
   `).join("") || "<p>Noch keine Klasse angelegt.</p>";
 
@@ -76,6 +127,12 @@ app.post("/teacher/classes", (req, res) => {
   res.redirect("/teacher");
 });
 
+app.post("/teacher/class/:id/delete", (req, res) => {
+  classes = classes.filter(c => c.id !== req.params.id);
+  students = students.filter(s => s.classId !== req.params.id);
+  res.redirect("/teacher");
+});
+
 app.get("/teacher/class/:id", (req, res) => {
   const schoolClass = classes.find(c => c.id === req.params.id);
   if (!schoolClass) return res.redirect("/teacher");
@@ -84,7 +141,10 @@ app.get("/teacher/class/:id", (req, res) => {
 
   const studentList = classStudents.map(s => `
     <div class="list">
-      ${s.name}
+      <strong>${s.name}</strong>
+      <form method="POST" action="/teacher/student/${s.id}/delete">
+        <button class="btn red" type="submit">Schüler/in entfernen</button>
+      </form>
     </div>
   `).join("") || "<p>Noch keine Schüler/innen angelegt.</p>";
 
@@ -112,6 +172,16 @@ app.post("/teacher/class/:id/students", (req, res) => {
   res.redirect(`/teacher/class/${req.params.id}`);
 });
 
+app.post("/teacher/student/:id/delete", (req, res) => {
+  const student = students.find(s => s.id === req.params.id);
+  if (!student) return res.redirect("/teacher");
+
+  const classId = student.classId;
+  students = students.filter(s => s.id !== req.params.id);
+
+  res.redirect(`/teacher/class/${classId}`);
+});
+
 app.get("/teacher/class/:id/start-league", (req, res) => {
   const schoolClass = classes.find(c => c.id === req.params.id);
   if (!schoolClass) return res.redirect("/teacher");
@@ -120,7 +190,7 @@ app.get("/teacher/class/:id/start-league", (req, res) => {
     <h1>Offizielles Liga-Spiel</h1>
     <p>Klasse: <strong>${schoolClass.name}</strong></p>
     <p>Hier startet später das freigegebene Liga-Spiel.</p>
-    <p class="small">Regel: Pro Klasse und pro Schüler nur 1× spielbar.</p>
+    <p class="small">Regel: Pro Klasse und pro Schüler/in nur 1× spielbar.</p>
     <a class="btn yellow" href="/teacher/class/${schoolClass.id}">Zurück</a>
   `));
 });
@@ -178,9 +248,32 @@ app.get("/practice/question/:id", (req, res) => {
 
 app.post("/practice/answer", (req, res) => {
   const id = Number(req.body.id);
-  let score = Number(req.body.score || 0);
-  if (Number(req.body.answer) === questions[id].correct) score++;
-  res.redirect(`/practice/question/${id + 1}?score=${score}&name=${encodeURIComponent(req.body.name)}`);
+  const oldScore = Number(req.body.score || 0);
+  const answer = Number(req.body.answer);
+  const name = req.body.name || "Player";
+
+  const isCorrect = answer === questions[id].correct;
+  const newScore = isCorrect ? oldScore + 1 : oldScore;
+
+  res.redirect(`/practice/feedback/${id}?score=${newScore}&name=${encodeURIComponent(name)}&correct=${isCorrect}&answer=${answer}`);
+});
+
+app.get("/practice/feedback/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const q = questions[id];
+  const score = Number(req.query.score || 0);
+  const name = req.query.name || "Player";
+  const isCorrect = req.query.correct === "true";
+
+  res.send(page(`
+    ${isCorrect ? `<div class="correct">✓</div><h1>Richtig!</h1>` : `<div class="wrong">✗</div><h1>Leider falsch!</h1>`}
+
+    <p><strong>Frage:</strong> ${q.q}</p>
+    <p><strong>Richtige Antwort:</strong><br>${q.answers[q.correct]}</p>
+    <p class="small">Aktueller Punktestand: ${score}</p>
+
+    <a class="btn blue" href="/practice/question/${id + 1}?score=${score}&name=${encodeURIComponent(name)}">Weiter</a>
+  `));
 });
 
 app.get("/practice/result", (req, res) => {
