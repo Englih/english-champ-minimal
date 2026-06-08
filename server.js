@@ -5,8 +5,9 @@ app.use(express.urlencoded({ extended: true }));
 
 let classes = [];
 let students = [];
+let leagueQuestions = [];
 
-const questions = [
+const practiceQuestions = [
   { q: "What does 'I have got' mean?", answers: ["Ich bin", "Ich habe", "Ich gehe", "Ich sehe"], correct: 1 },
   { q: "Choose the correct sentence.", answers: ["He have got a book.", "He has got a book.", "He got has a book.", "He is got a book."], correct: 1 },
   { q: "What is the plural of 'child'?", answers: ["childs", "childes", "children", "childrens"], correct: 2 },
@@ -37,8 +38,8 @@ body{
   border-radius:25px;
   box-shadow:0 10px 30px rgba(0,0,0,.25);
   text-align:center;
-  width:460px;
-  max-width:90%;
+  width:480px;
+  max-width:92%;
 }
 h1{color:#1f3f75;margin-top:0;}
 .btn{
@@ -59,7 +60,8 @@ h1{color:#1f3f75;margin-top:0;}
 .blue{background:#2196f3;color:white}
 .red{background:#e53935;color:white}
 .gray{background:#ddd;color:#222}
-input{
+.purple{background:#7b3ff2;color:white}
+input, select{
   width:100%;
   box-sizing:border-box;
   padding:12px;
@@ -79,6 +81,17 @@ input{
 .symbols{font-size:34px;margin-top:20px;}
 .correct{font-size:60px;color:#4caf50;}
 .wrong{font-size:60px;color:#e53935;}
+.separator{
+  margin:22px 0 14px 0;
+  border-top:1px solid #ddd;
+}
+.status{
+  background:#eef5ff;
+  padding:10px;
+  border-radius:12px;
+  margin-bottom:15px;
+  font-weight:bold;
+}
 </style>
 </head>
 <body><div class="card">${content}</div></body></html>`;
@@ -90,10 +103,80 @@ app.get("/", (req, res) => {
     <p>Play • Connect • Grow</p>
     <a class="btn yellow" href="/join">❤ Spiel beitreten</a>
     <a class="btn green" href="/teacher">♠ Lehrerbereich</a>
+    <a class="btn purple" href="/admin">♣ Adminbereich</a>
     <a class="btn blue" href="/practice">♦ Practice Mode</a>
     <div class="symbols">♥ ♠ ♦ ♣</div>
   `));
 });
+
+/* ADMINBEREICH */
+
+app.get("/admin", (req, res) => {
+  const list = leagueQuestions.map((q, index) => `
+    <div class="list">
+      <strong>Frage ${index + 1}:</strong> ${q.q}<br>
+      <span class="small">Richtig: ${q.answers[q.correct]}</span>
+      <form method="POST" action="/admin/question/${q.id}/delete">
+        <button class="btn red" type="submit">Frage löschen</button>
+      </form>
+    </div>
+  `).join("") || "<p>Noch keine offiziellen Liga-Fragen angelegt.</p>";
+
+  res.send(page(`
+    <h1>Adminbereich</h1>
+    <p>Nur der Admin legt offizielle Liga-Fragen an.</p>
+
+    <a class="btn purple" href="/admin/new-question">Neue Liga-Frage anlegen</a>
+
+    <h2>Offizielle Liga-Fragen</h2>
+    ${list}
+
+    <a class="btn yellow" href="/">Startseite</a>
+  `));
+});
+
+app.get("/admin/new-question", (req, res) => {
+  res.send(page(`
+    <h1>Neue Liga-Frage</h1>
+
+    <form method="POST" action="/admin/questions">
+      <input name="question" placeholder="Frage" required>
+      <input name="a0" placeholder="Antwort ♥" required>
+      <input name="a1" placeholder="Antwort ♠" required>
+      <input name="a2" placeholder="Antwort ♦" required>
+      <input name="a3" placeholder="Antwort ♣" required>
+
+      <select name="correct" required>
+        <option value="0">♥ Antwort 1 ist richtig</option>
+        <option value="1">♠ Antwort 2 ist richtig</option>
+        <option value="2">♦ Antwort 3 ist richtig</option>
+        <option value="3">♣ Antwort 4 ist richtig</option>
+      </select>
+
+      <button class="btn purple" type="submit">Liga-Frage speichern</button>
+    </form>
+
+    <a class="btn yellow" href="/admin">Zurück</a>
+  `));
+});
+
+app.post("/admin/questions", (req, res) => {
+  leagueQuestions.push({
+    id: Date.now().toString(),
+    q: req.body.question,
+    answers: [req.body.a0, req.body.a1, req.body.a2, req.body.a3],
+    correct: Number(req.body.correct)
+  });
+
+  res.redirect("/admin");
+});
+
+app.post("/admin/question/:id/delete", (req, res) => {
+  leagueQuestions = leagueQuestions.filter(q => q.id !== req.params.id);
+  res.redirect("/admin");
+});
+
+/* LEHRERBEREICH */
 
 app.get("/teacher", (req, res) => {
   const classList = classes.map(c => `
@@ -109,7 +192,7 @@ app.get("/teacher", (req, res) => {
 
   res.send(page(`
     <h1>Lehrerbereich</h1>
-    <p>Klassen und Schüler/innen anlegen</p>
+    <p>Lehrer legen Klassen und Schüler/innen an.</p>
 
     <form method="POST" action="/teacher/classes">
       <input name="className" placeholder="z. B. 2A" required>
@@ -189,11 +272,14 @@ app.get("/teacher/class/:id/start-league", (req, res) => {
   res.send(page(`
     <h1>Offizielles Liga-Spiel</h1>
     <p>Klasse: <strong>${schoolClass.name}</strong></p>
-    <p>Hier startet später das freigegebene Liga-Spiel.</p>
+    <p>Offizielle Liga-Fragen vorhanden: <strong>${leagueQuestions.length}</strong></p>
     <p class="small">Regel: Pro Klasse und pro Schüler/in nur 1× spielbar.</p>
+    <p>Das echte Liga-Spiel mit Spielcode und Sperre kommt im nächsten Schritt.</p>
     <a class="btn yellow" href="/teacher/class/${schoolClass.id}">Zurück</a>
   `));
 });
+
+/* SPIEL BEITRETEN */
 
 app.get("/join", (req, res) => {
   res.send(page(`
@@ -204,13 +290,18 @@ app.get("/join", (req, res) => {
   `));
 });
 
+/* PRACTICE MODE */
+
 app.get("/practice", (req, res) => {
   res.send(page(`
     <h1>Practice Mode</h1>
+    <p>Übungsfragen werden später KI-generiert.</p>
     <form method="POST" action="/practice/start">
       <input name="name" placeholder="Dein Name" required>
       <button class="btn blue" type="submit">Start</button>
     </form>
+
+    <div class="separator"></div>
     <a class="btn yellow" href="/">Practice Mode verlassen</a>
   `));
 });
@@ -224,15 +315,16 @@ app.get("/practice/question/:id", (req, res) => {
   const score = Number(req.query.score || 0);
   const name = req.query.name || "Player";
 
-  if (id >= questions.length) {
+  if (id >= practiceQuestions.length) {
     return res.redirect(`/practice/result?score=${score}&name=${encodeURIComponent(name)}`);
   }
 
-  const q = questions[id];
+  const q = practiceQuestions[id];
 
   res.send(page(`
-    <h1>Frage ${id + 1}/${questions.length}</h1>
+    <div class="status">Frage ${id + 1}/${practiceQuestions.length} · Punkte: ${score}</div>
     <h2>${q.q}</h2>
+
     <form method="POST" action="/practice/answer">
       <input type="hidden" name="id" value="${id}">
       <input type="hidden" name="score" value="${score}">
@@ -243,6 +335,8 @@ app.get("/practice/question/:id", (req, res) => {
         </button>
       `).join("")}
     </form>
+
+    <div class="separator"></div>
     <a class="btn yellow" href="/">Practice Mode verlassen</a>
   `));
 });
@@ -253,7 +347,7 @@ app.post("/practice/answer", (req, res) => {
   const answer = Number(req.body.answer);
   const name = req.body.name || "Player";
 
-  const isCorrect = answer === questions[id].correct;
+  const isCorrect = answer === practiceQuestions[id].correct;
   const newScore = isCorrect ? oldScore + 1 : oldScore;
 
   res.redirect(`/practice/feedback/${id}?score=${newScore}&name=${encodeURIComponent(name)}&correct=${isCorrect}`);
@@ -261,7 +355,7 @@ app.post("/practice/answer", (req, res) => {
 
 app.get("/practice/feedback/:id", (req, res) => {
   const id = Number(req.params.id);
-  const q = questions[id];
+  const q = practiceQuestions[id];
   const score = Number(req.query.score || 0);
   const name = req.query.name || "Player";
   const isCorrect = req.query.correct === "true";
@@ -274,6 +368,8 @@ app.get("/practice/feedback/:id", (req, res) => {
     <p class="small">Aktueller Punktestand: ${score}</p>
 
     <a class="btn blue" href="/practice/question/${id + 1}?score=${score}&name=${encodeURIComponent(name)}">Weiter</a>
+
+    <div class="separator"></div>
     <a class="btn yellow" href="/">Practice Mode verlassen</a>
   `));
 });
@@ -282,7 +378,7 @@ app.get("/practice/result", (req, res) => {
   res.send(page(`
     <h1>🏆 Ergebnis</h1>
     <h2>${req.query.name}</h2>
-    <p>Du hast <strong>${req.query.score} von ${questions.length}</strong> Punkten erreicht.</p>
+    <p>Du hast <strong>${req.query.score} von ${practiceQuestions.length}</strong> Punkten erreicht.</p>
     <a class="btn blue" href="/practice">Nochmal spielen</a>
     <a class="btn yellow" href="/">Startseite</a>
   `));
