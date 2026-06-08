@@ -211,7 +211,7 @@ app.get("/practice", (req, res) => {
       <input name="name" placeholder="Dein Name" required>
       <button class="btn blue" type="submit">Start</button>
     </form>
-    <a class="btn yellow" href="/">Zurück</a>
+    <a class="btn yellow" href="/">Practice Mode verlassen</a>
   `));
 });
 
@@ -243,6 +243,7 @@ app.get("/practice/question/:id", (req, res) => {
         </button>
       `).join("")}
     </form>
+    <a class="btn yellow" href="/">Practice Mode verlassen</a>
   `));
 });
 
@@ -255,7 +256,7 @@ app.post("/practice/answer", (req, res) => {
   const isCorrect = answer === questions[id].correct;
   const newScore = isCorrect ? oldScore + 1 : oldScore;
 
-  res.redirect(`/practice/feedback/${id}?score=${newScore}&name=${encodeURIComponent(name)}&correct=${isCorrect}&answer=${answer}`);
+  res.redirect(`/practice/feedback/${id}?score=${newScore}&name=${encodeURIComponent(name)}&correct=${isCorrect}`);
 });
 
 app.get("/practice/feedback/:id", (req, res) => {
@@ -273,6 +274,7 @@ app.get("/practice/feedback/:id", (req, res) => {
     <p class="small">Aktueller Punktestand: ${score}</p>
 
     <a class="btn blue" href="/practice/question/${id + 1}?score=${score}&name=${encodeURIComponent(name)}">Weiter</a>
+    <a class="btn yellow" href="/">Practice Mode verlassen</a>
   `));
 });
 
